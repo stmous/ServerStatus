@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup of the server room monitor
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

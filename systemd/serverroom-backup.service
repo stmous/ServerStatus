@@ -1,0 +1,9 @@
+[Unit]
+Description=Back up server room monitor config, Grafana and InfluxDB
+After=influxdb.service grafana-server.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/serverroom-monitor/scripts/backup.sh
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,36 @@
+# Chromium kiosk on a bare console using the "cage" Wayland compositor.
+# Used on Raspberry Pi OS Lite (display.hdmi.session: cage). On the Desktop
+# image the kiosk is started from the desktop session instead (see kiosk/).
+[Unit]
+Description=Server room dashboard kiosk (cage + Chromium)
+After=systemd-user-sessions.service plymouth-quit-wait.service grafana-server.service
+Wants=grafana-server.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=kiosk
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+EnvironmentFile=-/etc/serverroom-monitor/generated/kiosk.env
+EnvironmentFile=-/etc/serverroom-monitor/generated/kiosk-url.env
+Environment=XDG_SESSION_TYPE=wayland
+Environment=XCURSOR_THEME=serverroom-blank
+Environment=XCURSOR_SIZE=24
+# Wrapper picks cage flags (rotation) and runs the Chromium launcher inside it.
+ExecStart=/opt/serverroom-monitor/kiosk/serverroom-cage.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

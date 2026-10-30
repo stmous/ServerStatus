@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11" # same as Raspberry Pi OS Bookworm
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Type check
+        run: mypy
+      - name: Unit tests
+        run: pytest
+      - name: Simulated collector smoke test
+        run: |
+          PYTHONPATH=collector python -m serverroom_monitor -c config/config.example.yaml \
+            run --simulate --once --dry-run
+          PYTHONPATH=collector python -m serverroom_monitor -c config/config.example.yaml \
+            render-grafana --out "$RUNNER_TEMP/grafana"
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          shellcheck -x install.sh uninstall.sh scripts/*.sh influxdb/setup.sh \
+            kiosk/*.sh system/*.sh system/ups/*.sh

@@ -1,0 +1,9 @@
+# XDG autostart entry for the Raspberry Pi OS desktop (labwc, wayfire or X11).
+# Installed to ~kiosk/.config/autostart/ when display.hdmi.session is
+# "desktop" (or "auto" on the Desktop image).
+[Desktop Entry]
+Type=Application
+Name=Server Room Kiosk
+Exec=env XCURSOR_THEME=serverroom-blank /opt/serverroom-monitor/kiosk/serverroom-kiosk.sh
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

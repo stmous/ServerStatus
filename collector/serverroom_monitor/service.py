@@ -19,7 +19,7 @@ from serverroom_monitor.display.oled import ScreenState
 from serverroom_monitor.heartbeat import Heartbeat
 from serverroom_monitor.influx import RejectedWriteError, RetryableWriteError
 from serverroom_monitor.levels import classify
-from serverroom_monitor.models import RawReading, Reading
+from serverroom_monitor.models import AlertLevel, RawReading, Reading
 from serverroom_monitor.netinfo import TailscaleIP, primary_ipv4
 from serverroom_monitor.psychro import dew_point
 from serverroom_monitor.sdnotify import SystemdNotifier
@@ -282,7 +282,12 @@ class Collector:
         self.display.update(
             ScreenState(
                 reading=self.last_reading,
-                level=classify(self.last_reading, self.cfg.thresholds),
+                # Don't show "OK" based on a reading that is no longer current.
+                level=(
+                    classify(self.last_reading, self.cfg.thresholds)
+                    if sensor_ok
+                    else AlertLevel.UNKNOWN
+                ),
                 sensor_ok=sensor_ok,
                 ip=ip,
                 now=now,

@@ -14,6 +14,7 @@
 #   INFLUX_ADMIN_PASSWORD  used only for the initial setup
 #   INFLUX_OPERATOR_TOKEN  all-access operator token (set at initial setup)
 # Optional:
+#   CURRENT_WRITE_TOKEN, CURRENT_READ_TOKEN   tokens from a previous run (kept if valid)
 #   INFLUX_CLI             path to the influx CLI (default: influx)
 #   TASK_TEMPLATE          path to downsample_5m.flux
 set -euo pipefail
@@ -104,26 +105,60 @@ else
 fi
 
 # --- tokens -------------------------------------------------------------------
-# Find a token by description; create it with the given permissions if missing.
-token_for() {
-    local description=$1
+# InfluxDB >= 2.9 stores tokens hashed and never shows them again after
+# creation, so tokens cannot be looked up later. Instead: keep the tokens the
+# installer already holds (CURRENT_*_TOKEN, from secrets.env) as long as they
+# still work, and otherwise replace them (deleting stale ones by description).
+
+# Auth header from a file descriptor so tokens never show up in `ps`.
+http_code() { # TOKEN curl-args...
+    local token=$1
     shift
-    local token
-    token=$(cli auth list --org "$INFLUX_ORG" --json |
-        python3 -c 'import json,sys
-for a in json.load(sys.stdin):
-    if a.get("description")==sys.argv[1] and a.get("status","active")=="active":
-        print(a["token"]); break' "$description")
-    if [[ -z $token ]]; then
-        log "creating token '$description'"
-        token=$(cli auth create --org "$INFLUX_ORG" --description "$description" "$@" --json |
-            python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
-    fi
-    printf '%s' "$token"
+    curl -s -o /dev/null -w '%{http_code}' -H @<(printf 'Authorization: Token %s\n' "$token") "$@"
 }
 
-WRITE_TOKEN=$(token_for serverroom-collector --write-bucket "$RAW_ID")
-READ_TOKEN=$(token_for serverroom-grafana --read-bucket "$RAW_ID" --read-bucket "$DS_ID")
+can_write() { # empty body: 204 only with write permission, writes nothing
+    [[ -n $1 ]] && [[ $(http_code "$1" -X POST --data-binary '' \
+        "$INFLUX_HOST/api/v2/write?org=$INFLUX_ORG&bucket=$INFLUX_BUCKET&precision=s") == 204 ]]
+}
+
+can_read_bucket() { # TOKEN BUCKET
+    [[ $(http_code "$1" -X POST -H 'Content-Type: application/vnd.flux' \
+        --data "from(bucket: \"$2\") |> range(start: -1m) |> limit(n: 1)" \
+        "$INFLUX_HOST/api/v2/query?org=$INFLUX_ORG") == 200 ]]
+}
+
+can_read() {
+    [[ -n $1 ]] && can_read_bucket "$1" "$INFLUX_BUCKET" && can_read_bucket "$1" "$INFLUX_BUCKET_DS"
+}
+
+ensure_token() { # DESCRIPTION CHECK_FN CURRENT_TOKEN create-args...
+    local description=$1 check=$2 current=$3
+    shift 3
+    if "$check" "$current"; then
+        printf '%s' "$current"
+        return
+    fi
+    local id
+    for id in $(cli auth list --org "$INFLUX_ORG" --json |
+        python3 -c 'import json,sys
+for a in json.load(sys.stdin):
+    if a.get("description")==sys.argv[1]: print(a["id"])' "$description"); do
+        cli auth delete --id "$id" >/dev/null
+        log "deleted stale token '$description' ($id)"
+    done
+    log "creating token '$description'"
+    cli auth create --org "$INFLUX_ORG" --description "$description" "$@" --json |
+        python3 -c 'import json,sys; print(json.load(sys.stdin)["token"], end="")'
+}
+
+WRITE_TOKEN=$(ensure_token serverroom-collector can_write "${CURRENT_WRITE_TOKEN:-}" \
+    --write-bucket "$RAW_ID")
+READ_TOKEN=$(ensure_token serverroom-grafana can_read "${CURRENT_READ_TOKEN:-}" \
+    --read-bucket "$RAW_ID" --read-bucket "$DS_ID")
+[[ -n $WRITE_TOKEN && -n $READ_TOKEN ]] || die "token setup failed"
+can_write "$WRITE_TOKEN" || die "collector token cannot write to $INFLUX_BUCKET"
+can_read "$READ_TOKEN" || die "Grafana token cannot read the buckets"
 
 printf 'INFLUX_WRITE_TOKEN=%s\n' "$WRITE_TOKEN"
 printf 'INFLUX_READ_TOKEN=%s\n' "$READ_TOKEN"

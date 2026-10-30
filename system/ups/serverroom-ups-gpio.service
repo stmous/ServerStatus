@@ -1,0 +1,18 @@
+# EXAMPLE (not installed by default): watch a UPS HAT's active-low
+# "battery low" signal on GPIO 4 and shut down when it asserts.
+# Adjust the line number (gpiochip0 line 4 = GPIO4) for your HAT, then:
+#   sudo cp serverroom-ups-gpio.service /etc/systemd/system/
+#   sudo systemctl enable --now serverroom-ups-gpio.service
+# Requires: sudo apt install gpiod
+[Unit]
+Description=Shut down on UPS low-battery GPIO signal
+
+[Service]
+Type=simple
+# Bookworm ships libgpiod 1.6: gpiomon exits after one falling edge (-n 1).
+ExecStart=/usr/bin/gpiomon --num-events=1 --falling-edge gpiochip0 4
+ExecStopPost=/bin/sh -c '[ "$SERVICE_RESULT" = success ] && [ "$EXIT_STATUS" = 0 ] && /opt/serverroom-monitor/system/ups/serverroom-ups-shutdown.sh || true'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

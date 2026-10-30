@@ -1,0 +1,52 @@
+[Unit]
+Description=Server room environmental monitor (sensor collector)
+Documentation=file:///opt/serverroom-monitor/README.md
+Wants=network-online.target influxdb.service
+After=network-online.target time-sync.target influxdb.service
+# Keep retrying forever; never give up on a 24/7 monitor.
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=serverroom
+Group=serverroom
+SupplementaryGroups=i2c gpio
+EnvironmentFile=/etc/serverroom-monitor/env/collector.env
+ExecStart=/opt/serverroom-monitor/venv/bin/serverroom-monitor --config /etc/serverroom-monitor/config.yaml run
+Restart=always
+RestartSec=10
+# The loop pings the watchdog at least every 5 s, also during I2C retries and
+# buffer flushes, so 120 s only trips on a genuine hang.
+WatchdogSec=120
+TimeoutStartSec=360
+TimeoutStopSec=30
+StateDirectory=serverroom-monitor
+StateDirectoryMode=0750
+
+# --- hardening ----------------------------------------------------------------
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+CapabilityBoundingSet=
+# Only the I2C bus (and gpiomem, which Blinka's board detection may open).
+DevicePolicy=closed
+DeviceAllow=char-i2c rw
+DeviceAllow=/dev/gpiomem rw
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

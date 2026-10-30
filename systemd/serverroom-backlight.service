@@ -1,0 +1,7 @@
+[Unit]
+Description=Apply the configured backlight level to the touch display
+ConditionPathExistsGlob=/sys/class/backlight/*
+
+[Service]
+Type=oneshot
+ExecStart=/opt/serverroom-monitor/venv/bin/serverroom-monitor --config /etc/serverroom-monitor/config.yaml backlight
