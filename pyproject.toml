@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "serverroom-monitor"
+version = "1.0.0"
+description = "Server room temperature/humidity monitor for Raspberry Pi"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+# Runtime dependencies are pinned in requirements.txt and installed from
+# there; the package itself is installed with --no-deps.
+dependencies = []
+
+[project.scripts]
+serverroom-monitor = "serverroom_monitor.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["collector"]
+include = ["serverroom_monitor*"]
+
+[tool.pytest.ini_options]
+testpaths = ["collector/tests"]
+pythonpath = ["collector"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["collector", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PL", "N", "S", "C4", "RET", "PTH"]
+ignore = [
+    "PLR0913",  # many args are fine for config-driven constructors
+    "PLR0917",  # ...and for the Grafana JSON builders
+    "PLR2004",  # magic values in comparisons are mostly physical constants here
+    "S603",     # subprocess calls use fixed argv lists
+    "S607",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The notification template is kept on one line exactly as verified in Grafana.
+"collector/serverroom_monitor/grafana/alerting.py" = ["E501"]
+"collector/tests/**" = ["S101", "PLR2004", "S105", "S108"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "collector"
+packages = ["serverroom_monitor"]
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["board", "busio", "adafruit_sht4x", "adafruit_sht31d", "adafruit_bme280.*", "adafruit_ssd1306", "systemd.*"]
+ignore_missing_imports = true

@@ -1,0 +1,11 @@
+# Development / CI tooling (not installed on the Pi).
+#   uv pip compile requirements-dev.in -o requirements-dev.txt --python-version 3.11
+pillow
+PyYAML
+requests
+pytest
+ruff
+mypy
+types-PyYAML
+types-requests
+shellcheck-py

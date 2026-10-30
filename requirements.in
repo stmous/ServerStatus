@@ -1,0 +1,12 @@
+# Runtime dependencies of the collector. Compile the pinned
+# requirements.txt for the Pi (aarch64, CPython 3.11) with:
+#   uv pip compile requirements.in -o requirements.txt \
+#     --python-version 3.11 --python-platform aarch64-unknown-linux-gnu
+adafruit-blinka
+adafruit-circuitpython-sht4x
+adafruit-circuitpython-sht31d
+adafruit-circuitpython-bme280
+adafruit-circuitpython-ssd1306
+pillow
+PyYAML
+requests

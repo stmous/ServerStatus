@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+# Never commit real secrets or a live config
+secrets.env
+/config/config.yaml
+# Local test output
+*.sqlite
+*.sqlite-*

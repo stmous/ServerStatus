@@ -1,0 +1,220 @@
+# =============================================================================
+# Server Room Monitor - configuration
+#
+# Installed to /etc/serverroom-monitor/config.yaml. After editing, run:
+#     sudo /opt/serverroom-monitor/scripts/apply-config.sh
+# which validates the file, regenerates the Grafana dashboard/alerts and
+# restarts the services.
+#
+# Durations accept plain seconds (30) or a unit suffix: 30s, 2m, 1h, 7d.
+# Secrets (tokens, passwords, webhook URLs) do NOT go here. They live in
+# /etc/serverroom-monitor/secrets.env (mode 600).
+# =============================================================================
+
+# Name of this room. Used as the InfluxDB "location" tag and in alert texts.
+# Letters, digits, spaces, '.', '_' and '-'.
+location: server-room
+
+# -----------------------------------------------------------------------------
+# Sensor
+# -----------------------------------------------------------------------------
+sensor:
+  # sht4x   - Sensirion SHT40/41/45 (recommended; address 0x44, 0x45 or 0x46)
+  # sht31   - Sensirion SHT30/31/35 (0x44 or 0x45)
+  # bme280  - Bosch BME280 (0x76 or 0x77). Runs ~1 degC warm from self-heating.
+  # simulated - fake data, for testing without hardware
+  model: sht4x
+  i2c_address: 0x44
+
+  # How often to read the sensor.
+  poll_interval: 30s
+
+  # I2C error handling: retries per cycle with exponential backoff
+  # (0.5s, 1s, 2s, ...). After `reinit_after` failed cycles the bus is
+  # re-initialised; after `failure_threshold` failed cycles the sensor is
+  # reported as failed (sensor_ok=0), which triggers the "Sensor error" alert.
+  read_retries: 3
+  retry_backoff: 0.5s
+  reinit_after: 2
+  failure_threshold: 3
+
+# -----------------------------------------------------------------------------
+# Reading validation
+# -----------------------------------------------------------------------------
+validation:
+  # Readings outside these bounds are discarded as physically implausible.
+  temperature_min: -20
+  temperature_max: 80
+  humidity_min: 0
+  humidity_max: 100
+
+  # Spike filter: a reading that differs from the previous accepted one by
+  # more than this is held back. If `rebaseline_after` consecutive readings
+  # agree with each other, they are accepted as a genuine step change (so a
+  # real AC failure is never filtered out). The check only applies when the
+  # previous reading is younger than `jump_window`.
+  max_temperature_jump: 3.0
+  max_humidity_jump: 10.0
+  jump_window: 5m
+  rebaseline_after: 3
+
+# -----------------------------------------------------------------------------
+# Local display
+# -----------------------------------------------------------------------------
+display:
+  # hdmi - Grafana dashboard in Chromium kiosk mode (HDMI monitor or the
+  #        official Raspberry Pi 7" touch display)
+  # oled - SSD1306 128x64 I2C OLED
+  # none - headless
+  mode: hdmi
+
+  hdmi:
+    # auto    - use the desktop session if Raspberry Pi OS Desktop is
+    #           installed, otherwise a minimal "cage" kiosk compositor
+    # cage    - always use cage (recommended on Raspberry Pi OS Lite)
+    # desktop - autostart Chromium inside the labwc/wayfire/X11 desktop
+    session: auto
+    # Screen rotation in degrees (0, 90, 180, 270). For cage this is applied
+    # with wlr-randr; for the desktop use Screen Configuration instead.
+    rotation: 0
+    # Let the screen blank when idle? A server-room status screen is usually
+    # meant to stay on; use the night window below to save the panel instead.
+    screen_blanking: false
+    # Idle time before blanking (only if screen_blanking is true).
+    blank_after: 10m
+    # Backlight in percent (DSI touch displays only; ignored on HDMI).
+    brightness: 100
+    # Optional night window with reduced backlight, e.g. "22:00-07:00".
+    night: ""
+    night_brightness: 20
+    theme: dark
+
+  oled:
+    i2c_address: 0x3C
+    width: 128
+    height: 64
+    # 0-3, in steps of 90 degrees
+    rotate: 0
+    contrast: 255
+    # Shift the image by 1-2 px every update to prevent burn-in.
+    pixel_shift: true
+    # Optional night window ("22:00-07:00"): dim or switch the panel off.
+    night: ""
+    night_mode: dim
+
+# -----------------------------------------------------------------------------
+# InfluxDB (local). The collector's write token comes from secrets.env
+# (INFLUX_WRITE_TOKEN) and is created by the installer.
+# -----------------------------------------------------------------------------
+influxdb:
+  url: http://127.0.0.1:8086
+  org: serverroom
+  bucket: serverroom_raw          # full resolution
+  bucket_downsampled: serverroom_5m  # 5-minute mean/min/max
+  retention_raw: 30d
+  retention_downsampled: 730d
+  timeout: 5s
+
+# Local spool used while InfluxDB is unreachable. 500k points is roughly
+# 3 months of data at a 30 s interval (two points per cycle), a few tens of MB.
+buffer:
+  path: /var/lib/serverroom-monitor/buffer.sqlite
+  max_points: 500000
+
+# -----------------------------------------------------------------------------
+# Heartbeat / dead man's switch
+#
+# Pinged after every successful cycle; "<url>/fail" is pinged while the
+# sensor is failing. An external service (e.g. healthchecks.io: create a check
+# with period 1 min, grace 5 min) alerts you if the pings stop, which catches
+# a dead Pi, power loss or network failure that local alerting can't report.
+# Put the URL here or as HEARTBEAT_URL in secrets.env (that one wins).
+# -----------------------------------------------------------------------------
+heartbeat:
+  url: ""
+  timeout: 5s
+  # Set to "" for services without a failure endpoint.
+  fail_suffix: /fail
+
+# -----------------------------------------------------------------------------
+# Alert thresholds (used by Grafana alert rules, dashboard colours and the
+# OLED badge)
+# -----------------------------------------------------------------------------
+thresholds:
+  temperature:
+    warning_high: 27
+    critical_high: 30
+  humidity:
+    critical_low: 20
+    warning_low: 25
+    warning_high: 60
+    critical_high: 70
+  # Critical alert if no reading has arrived for this long.
+  stale_after: 3m
+  # A threshold must be breached continuously for this long before the alert
+  # fires (prevents flapping). Not applied to the stale-data alert.
+  pending_period: 2m
+
+# -----------------------------------------------------------------------------
+# Notification channels (Grafana contact points). Enable any combination.
+# Secrets go in secrets.env as noted.
+# -----------------------------------------------------------------------------
+notifications:
+  telegram:
+    enabled: false
+    # Numeric chat ID (groups start with -100...). See README.
+    # Secret: TELEGRAM_BOT_TOKEN
+    chat_id: ""
+
+  email:
+    enabled: false
+    addresses: [ops@example.com]
+    smtp_host: smtp.example.com
+    smtp_port: 587
+    smtp_user: ""            # leave empty for unauthenticated relays
+    from_address: serverroom@example.com
+    from_name: Server Room Monitor
+    # mandatory | opportunistic | none (use "none" for implicit TLS on 465)
+    starttls: mandatory
+    # Secret: SMTP_PASSWORD
+
+  webhook:
+    enabled: false
+    # slack | discord | teams | generic (JSON POST, Grafana webhook format)
+    type: generic
+    # Secret: WEBHOOK_URL
+
+  # Optional: a Grafana rule that is always firing and is sent every 5 min to
+  # DEADMAN_URL (in secrets.env), e.g. a second healthchecks.io check. If
+  # Grafana's alerting itself breaks, the pings stop and you are told.
+  deadman:
+    enabled: false
+
+  # Batching and re-notification
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval_warning: 4h
+  repeat_interval_critical: 1h
+
+# -----------------------------------------------------------------------------
+# Grafana and remote access
+# -----------------------------------------------------------------------------
+grafana:
+  # Grafana always listens on 127.0.0.1. Remote access goes through
+  # `tailscale serve` (HTTPS on your tailnet).
+  url: http://127.0.0.1:3000
+  port: 3000
+  tailscale_serve: true
+  # Also listen on all interfaces and allow the LAN subnets below through
+  # the firewall (plain HTTP).
+  lan_access: false
+
+firewall:
+  enabled: true
+  # Subnets allowed to reach SSH (and Grafana if lan_access is true).
+  # Empty = auto-detect the subnet of the default interface at install time.
+  lan_subnets: []
+
+backup:
+  directory: /var/backups/serverroom-monitor
+  keep: 7

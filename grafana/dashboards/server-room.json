@@ -1,0 +1,1089 @@
+{
+  "uid": "serverroom",
+  "title": "Server Room",
+  "description": "Environmental monitoring for server-room",
+  "tags": [
+    "serverroom"
+  ],
+  "timezone": "browser",
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "schemaVersion": 39,
+  "version": 1,
+  "links": [],
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Temperature",
+      "description": "Warning above 27 \u00b0C, critical above 30 \u00b0C",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"temperature\" and r.location == \"server-room\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 27.0
+              },
+              {
+                "color": "red",
+                "value": 30.0
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Humidity",
+      "description": "OK between 25 and 60 %RH; critical below 20 or above 70",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"humidity\" and r.location == \"server-room\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: %RH",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20.0
+              },
+              {
+                "color": "green",
+                "value": 25.0
+              },
+              {
+                "color": "orange",
+                "value": 60.0
+              },
+              {
+                "color": "red",
+                "value": 70.0
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Dew point",
+      "description": "Temperature at which condensation would form",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"dew_point\" and r.location == \"server-room\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Last reading",
+      "description": "Time since the last reading. Alert after 180 s.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"temperature\" and r.location == \"server-room\")\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, location: r.location, _value: float(v: uint(v: now()) - uint(v: r._time)) / 1000000000.0}))",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 65.0
+              },
+              {
+                "color": "red",
+                "value": 180.0
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Temperature",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "span = uint(v: v.timeRangeStop) - uint(v: v.timeRangeStart)\nuseDownsampled = span > uint(v: 172800000000000)\nsrc = if useDownsampled then \"serverroom_5m\" else \"serverroom_raw\"\nfrom(bucket: src)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"temperature\" and r.location == \"server-room\")\n  |> filter(fn: (r) => not exists r.agg or r.agg == \"mean\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "displayName": "Temperature",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#F2CC0C"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 27.0
+              },
+              {
+                "color": "red",
+                "value": 30.0
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": 300000,
+            "axisSoftMin": 18,
+            "axisSoftMax": 32.0,
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": false,
+          "displayMode": "hidden",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Humidity",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "span = uint(v: v.timeRangeStop) - uint(v: v.timeRangeStart)\nuseDownsampled = span > uint(v: 172800000000000)\nsrc = if useDownsampled then \"serverroom_5m\" else \"serverroom_raw\"\nfrom(bucket: src)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"humidity\" and r.location == \"server-room\")\n  |> filter(fn: (r) => not exists r.agg or r.agg == \"mean\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: %RH",
+          "decimals": 1,
+          "displayName": "Humidity",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20.0
+              },
+              {
+                "color": "transparent",
+                "value": 25.0
+              },
+              {
+                "color": "orange",
+                "value": 60.0
+              },
+              {
+                "color": "red",
+                "value": 70.0
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": 300000,
+            "axisSoftMin": 15.0,
+            "axisSoftMax": 75.0,
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": false,
+          "displayMode": "hidden",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Last 24 hours",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "TMIN",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"temperature\" and r.location == \"server-room\")\n  |> min()\n  |> keep(columns: [\"_value\"])",
+          "hide": false
+        },
+        {
+          "refId": "TAVG",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"temperature\" and r.location == \"server-room\")\n  |> mean()\n  |> keep(columns: [\"_value\"])",
+          "hide": false
+        },
+        {
+          "refId": "TMAX",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"temperature\" and r.location == \"server-room\")\n  |> max()\n  |> keep(columns: [\"_value\"])",
+          "hide": false
+        },
+        {
+          "refId": "HMIN",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"humidity\" and r.location == \"server-room\")\n  |> min()\n  |> keep(columns: [\"_value\"])",
+          "hide": false
+        },
+        {
+          "refId": "HAVG",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"humidity\" and r.location == \"server-room\")\n  |> mean()\n  |> keep(columns: [\"_value\"])",
+          "hide": false
+        },
+        {
+          "refId": "HMAX",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"environment\" and r._field == \"humidity\" and r.location == \"server-room\")\n  |> max()\n  |> keep(columns: [\"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 27.0
+              },
+              {
+                "color": "red",
+                "value": 30.0
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "TMIN"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Temp min"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "TAVG"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Temp avg"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "TMAX"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Temp max"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "HMIN"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "RH min"
+              },
+              {
+                "id": "unit",
+                "value": "suffix: %RH"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 20.0
+                    },
+                    {
+                      "color": "green",
+                      "value": 25.0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 60.0
+                    },
+                    {
+                      "color": "red",
+                      "value": 70.0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "HAVG"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "RH avg"
+              },
+              {
+                "id": "unit",
+                "value": "suffix: %RH"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 20.0
+                    },
+                    {
+                      "color": "green",
+                      "value": 25.0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 60.0
+                    },
+                    {
+                      "color": "red",
+                      "value": 70.0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "HMAX"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "RH max"
+              },
+              {
+                "id": "unit",
+                "value": "suffix: %RH"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 20.0
+                    },
+                    {
+                      "color": "green",
+                      "value": 25.0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 60.0
+                    },
+                    {
+                      "color": "red",
+                      "value": 70.0
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Sensor",
+      "description": "Collector-reported sensor health (read errors after retries)",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"collector_status\" and r._field == \"sensor_ok\" and r.location == \"server-room\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "ERROR",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Buffered points",
+      "description": "Points waiting in the local spool (non-zero after an InfluxDB outage)",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 14,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"collector_status\" and r._field == \"buffered_points\" and r.location == \"server-room\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Read errors",
+      "description": "I2C read errors since the collector started (retries included)",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"collector_status\" and r._field == \"read_errors_total\" and r.location == \"server-room\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Discarded readings",
+      "description": "Readings rejected by validation (out of bounds or spikes) since start",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "serverroom-influx"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 14,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "serverroom-influx"
+          },
+          "query": "from(bucket: \"serverroom_raw\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r._measurement == \"collector_status\" and r._field == \"discarded_total\" and r.location == \"server-room\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "hide": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 12,
+      "type": "alertlist",
+      "title": "Active alerts",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 6
+      },
+      "options": {
+        "viewMode": "list",
+        "groupMode": "default",
+        "maxItems": 20,
+        "sortOrder": 1,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "normal": false
+        },
+        "folder": null
+      }
+    }
+  ]
+}
