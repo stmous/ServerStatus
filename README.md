@@ -488,7 +488,7 @@ managed anymore. Reset it (this **deletes recorded data**):
 
 This was built and tested **without a Raspberry Pi**:
 
-**Verified** (automated tests, plus runs against real InfluxDB 2.8.0/2.9.1 and Grafana 12.3 on x86):
+**Verified** (automated tests, plus runs against real InfluxDB 2.8.0/2.9.1 and Grafana 12.3 and 13.3 on x86):
 
 - the collector loop, validation, dew point, buffering through an InfluxDB outage, flush, watchdog notifications and SIGTERM;
 - the InfluxDB setup script (fresh, rerun, lost secrets), least-privilege tokens, and that the downsampling Flux produces 5-minute mean/min/max;

@@ -106,6 +106,13 @@ def grafana_settings(cfg: Config, provisioning_dir: Path, root_url: str | None) 
         "GF_NEWS_NEWS_FEED_ENABLED": "false",
         "GF_DASHBOARDS_MIN_REFRESH_INTERVAL": "10s",
         "GF_PUBLIC_DASHBOARDS_ENABLED": "true",
+        # Grafana 13 ships InfluxDB as a separately downloaded plugin. Install
+        # it *before* startup (not in the background) so provisioning and the
+        # first alert evaluations have it, and don't re-check for plugin
+        # updates on every restart: that needs internet and changes behaviour
+        # unattended (upgrade Grafana deliberately instead, see README).
+        "GF_PLUGINS_PREINSTALL_SYNC": "influxdb",
+        "GF_PLUGINS_PREINSTALL_AUTO_UPDATE": "false",
         "GF_UNIFIED_ALERTING_ENABLED": "true",
         "GF_DATABASE_WAL": "true",
         "GF_LOG_MODE": "console",

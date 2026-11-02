@@ -46,74 +46,113 @@ def _fail(name: str, why: str) -> None:
 # --------------------------------------------------------------------------
 
 
+RECEIVERS_API = "/apis/notifications.alerting.grafana.app/v1beta1/namespaces/default/receivers"
+LEGACY_TEST_API = "/api/alertmanager/grafana/config/api/v1/receivers/test"
+
+
+def _test_alert(cfg: Config) -> dict[str, Any]:
+    return {
+        "labels": {"alertname": "TestAlert", "severity": "warning", "location": cfg.location},
+        "annotations": {"summary": _message(cfg)},
+    }
+
+
+def _report(name: str, error: str | None) -> int:
+    if error is None:
+        _ok(name)
+        return 0
+    _fail(name, error)
+    return 1
+
+
+def _test_integration(
+    cfg: Config, base: str, auth: tuple[str, str], receiver: str, integration: dict[str, Any]
+) -> str | None:
+    """Test one integration with Grafana >= 13's receivers API. None = success."""
+    body = {"integration": integration, "alert": _test_alert(cfg)}
+    try:
+        r = requests.post(
+            f"{base}{RECEIVERS_API}/{receiver}/test", json=body, auth=auth, timeout=60
+        )
+    except requests.RequestException as exc:
+        return str(exc)
+    result = r.json() if r.content else {}
+    if r.status_code == 200 and result.get("status") == "success":
+        return None
+    return str(result.get("error") or f"HTTP {r.status_code} {r.text[:200]}")
+
+
+def _test_integration_legacy(
+    cfg: Config, base: str, auth: tuple[str, str], integration: dict[str, Any]
+) -> str | None:
+    """Grafana <= 12: the Alertmanager-config test endpoint (removed in 13)."""
+    body = {
+        "receivers": [{"name": CONTACT_POINT, "grafana_managed_receiver_configs": [integration]}],
+        "alert": _test_alert(cfg),
+    }
+    try:
+        r = requests.post(f"{base}{LEGACY_TEST_API}", json=body, auth=auth, timeout=60)
+    except requests.RequestException as exc:
+        return str(exc)
+    errors = [
+        c.get("error", "")
+        for rec in (r.json().get("receivers", []) if r.content else [])
+        for c in rec.get("grafana_managed_receiver_configs", [])
+        if c.get("status") != "ok"
+    ]
+    if r.status_code == 200 and not errors:
+        return None
+    return "; ".join(e for e in errors if e) or f"HTTP {r.status_code} {r.text[:200]}"
+
+
+def _integrations(base: str, auth: tuple[str, str]) -> tuple[str, list[dict[str, Any]]] | None:
+    """Return (api, integrations of serverroom-notify), trying Grafana 13's API first."""
+    r = requests.get(f"{base}{RECEIVERS_API}", auth=auth, timeout=10)
+    if r.status_code == 401:
+        raise PermissionError
+    if r.status_code == 200:
+        for item in r.json().get("items", []):
+            if item["spec"]["title"] == CONTACT_POINT:
+                integrations = item["spec"]["integrations"]
+                return item["metadata"]["name"], integrations
+        return None
+    # Older Grafana: read the Alertmanager config instead.
+    r = requests.get(f"{base}/api/alertmanager/grafana/config/api/v1/alerts", auth=auth, timeout=10)
+    if r.status_code == 401:
+        raise PermissionError
+    r.raise_for_status()
+    for rec in r.json().get("alertmanager_config", {}).get("receivers", []):
+        if rec["name"] == CONTACT_POINT:
+            return "", rec.get("grafana_managed_receiver_configs", [])
+    return None
+
+
 def _via_grafana(cfg: Config, base: str, password: str) -> int:
     auth = ("admin", password)
     try:
-        resp = requests.get(
-            f"{base}/api/alertmanager/grafana/config/api/v1/alerts", auth=auth, timeout=10
-        )
+        found = _integrations(base, auth)
+    except PermissionError:
+        _fail("grafana", "login failed (check GRAFANA_ADMIN_PASSWORD in secrets.env)")
+        return 1
     except requests.RequestException as exc:
         _fail("grafana", f"unreachable at {base}: {exc}")
         return 1
-    if resp.status_code == 401:
-        _fail("grafana", "login failed (check GRAFANA_ADMIN_PASSWORD in secrets.env)")
-        return 1
-    resp.raise_for_status()
-    receivers = resp.json().get("alertmanager_config", {}).get("receivers", [])
-    configs: list[dict[str, Any]] = next(
-        (
-            r.get("grafana_managed_receiver_configs", [])
-            for r in receivers
-            if r["name"] == CONTACT_POINT
-        ),
-        [],
-    )
-    if not configs:
+    integrations = [i for i in (found[1] if found else []) if i.get("uid") != "sr-none"]
+    if not found or not integrations:
         _fail(
             "grafana",
-            f"contact point '{CONTACT_POINT}' has no integrations; "
-            "enable a channel in config.yaml and run apply-config.sh",
+            "no notification channel is enabled; enable one in config.yaml and run apply-config.sh",
         )
         return 1
-
+    receiver = found[0]
     failures = 0
-    for integration in configs:
+    for integration in integrations:
         name = f"{integration['type']} ({integration.get('uid', '?')})"
-        body = {
-            "receivers": [
-                {"name": CONTACT_POINT, "grafana_managed_receiver_configs": [integration]}
-            ],
-            "alert": {
-                "labels": {
-                    "alertname": "TestAlert",
-                    "severity": "warning",
-                    "location": cfg.location,
-                },
-                "annotations": {"summary": _message(cfg)},
-            },
-        }
-        try:
-            r = requests.post(
-                f"{base}/api/alertmanager/grafana/config/api/v1/receivers/test",
-                json=body,
-                auth=auth,
-                timeout=60,
-            )
-        except requests.RequestException as exc:
-            _fail(name, str(exc))
-            failures += 1
-            continue
-        errors = [
-            cfg_result.get("error", "")
-            for rec in (r.json().get("receivers", []) if r.content else [])
-            for cfg_result in rec.get("grafana_managed_receiver_configs", [])
-            if cfg_result.get("status") != "ok"
-        ]
-        if r.status_code == 200 and not errors:
-            _ok(name)
+        if receiver:
+            error = _test_integration(cfg, base, auth, receiver, integration)
         else:
-            failures += 1
-            _fail(name, "; ".join(e for e in errors if e) or f"HTTP {r.status_code} {r.text[:200]}")
+            error = _test_integration_legacy(cfg, base, auth, integration)
+        failures += _report(name, error)
     return 1 if failures else 0
 
 

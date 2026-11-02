@@ -19,7 +19,13 @@ FOLDER = "Server Room"
 GROUP = "serverroom"
 CONTACT_POINT = "serverroom-notify"
 DEADMAN_CONTACT_POINT = "serverroom-deadman"
-DEFAULT_CONTACT_POINT = "grafana-default-email"
+# With no channel enabled, serverroom-notify still needs one integration:
+# routing must never reference Grafana's built-in "grafana-default-email"
+# (Grafana 13 can start provisioning before that exists and then refuses to
+# start), and Grafana 12 rejects a contact point without integrations. The
+# URL is deliberately unreachable and explains itself in Grafana's log.
+PLACEHOLDER_URL = "http://127.0.0.1:9/no-notification-channel-configured"
+MANAGED_UIDS = ("sr-telegram", "sr-email", "sr-webhook", "sr-deadman", "sr-none")
 
 Json = dict[str, Any]
 
@@ -341,9 +347,15 @@ def _receivers(cfg: Config) -> list[Json]:
 
 def build_contact_points(cfg: Config) -> Json:
     contact_points: list[Json] = []
-    receivers = _receivers(cfg)
-    if receivers:
-        contact_points.append({"orgId": 1, "name": CONTACT_POINT, "receivers": receivers})
+    receivers = _receivers(cfg) or [
+        {
+            "uid": "sr-none",
+            "type": "webhook",
+            "disableResolveMessage": True,
+            "settings": {"url": PLACEHOLDER_URL, "httpMethod": "POST"},
+        }
+    ]
+    contact_points.append({"orgId": 1, "name": CONTACT_POINT, "receivers": receivers})
     if cfg.notifications.deadman.enabled:
         contact_points.append(
             {
@@ -365,9 +377,7 @@ def build_contact_points(cfg: Config) -> Json:
         "contactPoints": contact_points,
     }
     # Remove channels that were disabled since the last render.
-    disabled = {"sr-telegram", "sr-email", "sr-webhook", "sr-deadman"} - {
-        r["uid"] for cp in contact_points for r in cp["receivers"]
-    }
+    disabled = set(MANAGED_UIDS) - {r["uid"] for cp in contact_points for r in cp["receivers"]}
     if disabled:
         doc["deleteContactPoints"] = [{"orgId": 1, "uid": uid} for uid in sorted(disabled)]
     return doc
@@ -375,7 +385,7 @@ def build_contact_points(cfg: Config) -> Json:
 
 def build_policies(cfg: Config) -> Json:
     n = cfg.notifications
-    receiver = CONTACT_POINT if n.any_enabled else DEFAULT_CONTACT_POINT
+    receiver = CONTACT_POINT
     routes: list[Json] = []
     if n.deadman.enabled:
         routes.append(

@@ -18,7 +18,16 @@ templates:
     {{ template "serverroom.title" . }}
     {{ template "serverroom.message" . }}
     {{- end }}
-contactPoints: []
+contactPoints:
+- orgId: 1
+  name: serverroom-notify
+  receivers:
+  - uid: sr-none
+    type: webhook
+    disableResolveMessage: true
+    settings:
+      url: http://127.0.0.1:9/no-notification-channel-configured
+      httpMethod: POST
 deleteContactPoints:
 - orgId: 1
   uid: sr-deadman

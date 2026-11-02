@@ -101,7 +101,7 @@ def test_contact_points_all_channels() -> None:
     assert receivers["sr-webhook"]["settings"]["url"] == "${WEBHOOK_URL}"
     assert all(not r["disableResolveMessage"] for r in receivers.values())
     assert cps["serverroom-deadman"]["receivers"][0]["settings"]["url"] == "${DEADMAN_URL}"
-    assert "deleteContactPoints" not in doc
+    assert doc["deleteContactPoints"] == [{"orgId": 1, "uid": "sr-none"}]
 
 
 def test_contact_points_only_contain_secret_placeholders() -> None:
@@ -118,17 +118,28 @@ def test_webhook_types() -> None:
         assert cp["receivers"][0]["type"] == grafana_type
 
 
-def test_disabled_channels_are_deleted_and_default_receiver_used() -> None:
+def test_no_channels_uses_placeholder_never_grafana_default() -> None:
     cfg = parse_config(None, env={})
     doc = build_contact_points(cfg)
-    assert doc["contactPoints"] == []
+    (cp,) = doc["contactPoints"]
+    assert cp["name"] == "serverroom-notify"
+    (placeholder,) = cp["receivers"]
+    assert placeholder["uid"] == "sr-none"
+    assert "no-notification-channel-configured" in placeholder["settings"]["url"]
     assert {d["uid"] for d in doc["deleteContactPoints"]} == {
         "sr-telegram",
         "sr-email",
         "sr-webhook",
         "sr-deadman",
     }
-    assert build_policies(cfg)["policies"][0]["receiver"] == "grafana-default-email"
+    policies = build_policies(cfg)["policies"][0]
+    assert policies["receiver"] == "serverroom-notify"
+    assert "grafana-default-email" not in yaml.safe_dump(build_policies(cfg))
+
+
+def test_placeholder_removed_once_a_channel_is_enabled() -> None:
+    doc = build_contact_points(all_channels())
+    assert {"orgId": 1, "uid": "sr-none"} in doc["deleteContactPoints"]
 
 
 def test_policies() -> None:
@@ -188,6 +199,8 @@ def test_render_default_binds_localhost(tmp_path: Path) -> None:
     settings = (tmp_path / "grafana-settings.env").read_text()
     assert 'GF_SERVER_HTTP_ADDR="127.0.0.1"' in settings
     assert 'GF_SECURITY_COOKIE_SECURE="true"' in settings
+    # Grafana 13: the InfluxDB datasource is a plugin that must exist before startup.
+    assert 'GF_PLUGINS_PREINSTALL_SYNC="influxdb"' in settings
     assert "GF_SERVER_ROOT_URL" not in settings
 
 
