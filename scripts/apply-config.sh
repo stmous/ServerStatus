@@ -36,6 +36,12 @@ n_enabled email && [[ -n $(cfg notifications.email.smtp_user) && -z $(secret_get
 write_service_envs
 ok "env/collector.env, env/grafana.env"
 
+# --- sensor -------------------------------------------------------------------------
+# Early on purpose: it must not depend on Grafana or anything else below.
+step "Sensor overlay"
+sync_dht_overlay
+[[ $(cfg sensor.model) == dht* ]] || ok "not needed for $(cfg sensor.model)"
+
 # --- Grafana provisioning -----------------------------------------------------------
 step "Rendering Grafana provisioning"
 ROOT_URL=""
@@ -59,20 +65,28 @@ done
 systemctl daemon-reload
 
 step "Restarting Grafana"
+GRAFANA_OK=1
 systemctl enable grafana-server.service >/dev/null 2>&1
-systemctl restart grafana-server.service
-grafana_wait || die "Grafana did not come up; see: journalctl -u grafana-server -n 50"
-grafana_sync_admin_password
-# Fail loudly if provisioning was rejected (e.g. a broken template).
-if journalctl -u grafana-server --since "-2min" --no-pager 2>/dev/null |
-    grep -E 'level=(error|eror)' | grep -iE 'provision|alerting' | grep -v plugin; then
-    warn "Grafana reported provisioning errors (above)"
+systemctl restart grafana-server.service || true
+info "waiting for Grafana (the first start on a Pi can take a few minutes)"
+if grafana_wait; then
+    grafana_sync_admin_password
+    # Fail loudly if provisioning was rejected (e.g. a broken template).
+    if journalctl -u grafana-server --since "-5min" --no-pager 2>/dev/null |
+        grep -E 'level=(error|eror)' | grep -iE 'provision|alerting' | grep -v plugin; then
+        warn "Grafana reported provisioning errors (above)"
+    fi
+    grafana_sync_public_dashboard "$MODE"
+    ok "Grafana running"
+else
+    # Keep going: the sensor, firewall, display and collector don't need Grafana.
+    GRAFANA_OK=0
+    warn "Grafana did not come up. Last log lines:"
+    journalctl -u grafana-server -n 25 --no-pager 2>&1 | sed 's/^/      /' >&2 || true
 fi
-grafana_sync_public_dashboard "$MODE"
-ok "Grafana running"
 
 # --- Tailscale serve ------------------------------------------------------------------
-if command -v tailscale >/dev/null; then
+if command -v tailscale >/dev/null && ((GRAFANA_OK)); then
     step "Tailscale"
     if [[ -z $TS_NAME ]]; then
         warn "Tailscale is installed but not logged in. Run: sudo tailscale up --ssh=false"
@@ -106,10 +120,6 @@ if [[ $(cfg firewall.enabled) == 1 ]]; then
 fi
 
 # --- local display ------------------------------------------------------------------------
-step "Sensor overlay"
-sync_dht_overlay
-[[ $(cfg sensor.model) == dht* ]] || ok "not needed for $(cfg sensor.model)"
-
 step "Display: $MODE"
 "$APP_DIR/scripts/setup-kiosk.sh" "$MODE"
 
@@ -125,4 +135,7 @@ else
     warn "serverroom-monitor is not running: journalctl -u serverroom-monitor -n 30"
 fi
 
+if ((!GRAFANA_OK)); then
+    die "configuration applied except Grafana (see the log lines above); fix it and re-run"
+fi
 printf '\n%sConfiguration applied.%s\n' "$C_GRN" "$C_OFF"

@@ -124,7 +124,7 @@ write_service_envs() {
 # --- Grafana API --------------------------------------------------------------
 
 grafana_wait() {
-    for _ in $(seq 1 90); do
+    for _ in $(seq 1 150); do # up to ~5 minutes
         curl -fsS -m 3 "$GRAFANA_INTERNAL/api/health" >/dev/null 2>&1 && return 0
         sleep 2
     done
