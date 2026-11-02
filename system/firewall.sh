@@ -34,7 +34,8 @@ COMMENT="serverroom-monitor"
 # re-runs don't accumulate duplicates and other rules you added survive.
 mapfile -t ours < <(ufw status numbered 2>/dev/null | grep -F "# $COMMENT" | sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn)
 for n in "${ours[@]}"; do
-    yes | ufw delete "$n" >/dev/null
+    # --force instead of `yes |`: under pipefail, `yes` dies of SIGPIPE (141).
+    ufw --force delete "$n" >/dev/null
 done
 
 # Order matters: allow SSH *before* enabling, or an SSH session gets cut off.

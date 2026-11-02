@@ -234,7 +234,10 @@ sync_dht_overlay() {
     current=$(grep -A1 -xF "$DHT_MARKER" "$boot" | sed -n 2p || true)
     if [[ $model == dht11 || $model == dht22 ]]; then
         line="dtoverlay=dht11,gpiopin=$gpio"
-        [[ $current == "$line" ]] && return 0
+        if [[ $current == "$line" ]]; then
+            ok "'$line' already in $boot"
+            return 0
+        fi
         _remove_dht_block "$boot"
         # [all] so the line is never swallowed by an earlier [pi4]/[cm4] filter.
         printf '\n[all]\n%s\n%s\n' "$DHT_MARKER" "$line" >>"$boot"

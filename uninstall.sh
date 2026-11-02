@@ -57,7 +57,7 @@ step "Removing firewall rules and tailscale serve"
 if command -v ufw >/dev/null; then
     mapfile -t ours < <(ufw status numbered 2>/dev/null | grep -F "# serverroom-monitor" |
         sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn)
-    for n in "${ours[@]}"; do yes | ufw delete "$n" >/dev/null; done
+    for n in "${ours[@]}"; do ufw --force delete "$n" >/dev/null; done
     warn "ufw is still enabled; make sure SSH remains allowed (sudo ufw status)"
 fi
 command -v tailscale >/dev/null && tailscale serve --https=443 off >/dev/null 2>&1 || true

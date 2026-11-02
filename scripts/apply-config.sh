@@ -66,13 +66,15 @@ systemctl daemon-reload
 
 step "Restarting Grafana"
 GRAFANA_OK=1
+RESTARTED_AT=$(date '+%Y-%m-%d %H:%M:%S')
 systemctl enable grafana-server.service >/dev/null 2>&1
 systemctl restart grafana-server.service || true
 info "waiting for Grafana (the first start on a Pi can take a few minutes)"
 if grafana_wait; then
     grafana_sync_admin_password
-    # Fail loudly if provisioning was rejected (e.g. a broken template).
-    if journalctl -u grafana-server --since "-5min" --no-pager 2>/dev/null |
+    # Fail loudly if provisioning was rejected (e.g. a broken template). Only
+    # look at this start: older lines may be from before a fix.
+    if journalctl -u grafana-server --since "$RESTARTED_AT" --no-pager 2>/dev/null |
         grep -E 'level=(error|eror)' | grep -iE 'provision|alerting' | grep -v plugin; then
         warn "Grafana reported provisioning errors (above)"
     fi
