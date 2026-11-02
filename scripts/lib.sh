@@ -150,10 +150,23 @@ grafana_sync_admin_password() {
     local code
     code=$(_curl_admin -s -o /dev/null -w '%{http_code}' "$GRAFANA_INTERNAL/api/user")
     [[ $code == 200 ]] && return 0
-    info "resetting Grafana admin password to the one in secrets.env"
+    info "setting the Grafana admin password from secrets.env"
+    # The CLI must open the database the way the server does (WAL mode, set in
+    # grafana-settings.env); otherwise Grafana 13's CLI fails with
+    # "database is locked (SQLITE_BUSY)" and the password silently stays old.
     secret_get GRAFANA_ADMIN_PASSWORD |
-        (cd /usr/share/grafana && runuser -u grafana -- grafana cli --homepath /usr/share/grafana \
-            --config /etc/grafana/grafana.ini admin reset-admin-password --password-from-stdin >/dev/null)
+        (cd /usr/share/grafana && runuser -u grafana -- env GF_DATABASE_WAL=true \
+            grafana cli --homepath /usr/share/grafana --config /etc/grafana/grafana.ini \
+            admin reset-admin-password --password-from-stdin 2>&1 |
+            grep -E 'changed|Error|✗' | sed 's/^/      /') || true
+    code=$(_curl_admin -s -o /dev/null -w '%{http_code}' "$GRAFANA_INTERNAL/api/user")
+    if [[ $code == 200 ]]; then
+        ok "Grafana admin password updated"
+    else
+        warn "Grafana still rejects the password from secrets.env (HTTP $code)."
+        warn "Grafana locks a user for 5 minutes after repeated failed logins; wait and re-run."
+        return 1
+    fi
 }
 
 # The kiosk opens a read-only shared ("public") dashboard link so it needs no
