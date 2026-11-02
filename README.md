@@ -44,6 +44,7 @@ See [docs/architecture.md](docs/architecture.md) for the reasoning behind the de
 | USB 3 SSD (any size ≥ 32 GB) + UASP enclosure | Far more durable than an SD card for 24/7 writes. Boot from it via `raspi-config` → Advanced → Boot Order |
 | Case with passive cooling (e.g. Flirc, Argon NEO) | Keep the Pi's own heat away from the sensor |
 | **Sensirion SHT45 breakout**, e.g. Adafruit 5665 (STEMMA QT) | ±0.1 °C / ±1 %RH. SHT31 (Adafruit 2857) and BME280 (Adafruit 2652) also supported |
+| *or, to get started:* **KY-015** (DHT11) or a DHT22/AM2302 module | Works, but much coarser; see [KY-015 / DHT11](#ky-015--dht11-dht22) |
 | STEMMA QT / Qwiic to female jumper cable, e.g. Adafruit 4397 (150 mm) or 4209 | Or four female–female Dupont wires |
 | Optional: longer cable or I2C extender | Plain I2C is reliable to roughly 1 m. For the rack front 2–5 m away, use a differential extender (e.g. SparkFun QwiicBus, PCA9615-based) |
 | Display, one of: official Raspberry Pi 7" Touch Display (v1 800×480 or Touch Display 2), any HDMI monitor, or an SSD1306 128×64 I2C OLED (0x3C) | Or none |
@@ -77,6 +78,40 @@ The **OLED** goes on the same four pins (I2C is a bus): wire its VCC, GND, SDA
 and SCL in parallel with the sensor, or daisy-chain STEMMA QT boards. The SHT45
 answers at 0x44, the OLED at 0x3C. Most breakout boards already have pull-up
 resistors; don't add more.
+
+### KY-015 / DHT11, DHT22
+
+The KY-015 is a DHT11 on a small board. It uses its own single-wire protocol on
+a GPIO pin, **not I2C**, so it is wired differently:
+
+| KY-015 pin | Pi header pin | Function |
+|---|---|---|
+| **S** (signal) | **7** | GPIO4 (data) |
+| middle pin (**+**/VCC) | **1** | 3.3 V |
+| **−** | **9** | Ground |
+
+```
+                       ┌─────────┐
+    KY-015 + ─────  3V3│ (1) (2) │5V
+                  GPIO2│ (3) (4) │5V
+                  GPIO3│ (5) (6) │GND
+    KY-015 S ──── GPIO4│ (7) (8) │
+    KY-015 − ────── GND│ (9) (10)│
+                       └─────────┘
+```
+
+- **Power it from 3.3 V, never 5 V.** The module has a pull-up resistor from the data line to VCC, so 5 V would put 5 V on the Pi's GPIO and can damage it.
+- Check the labels on your board: pin order differs between KY-015 clones.
+- Configure it:
+  ```yaml
+  sensor:
+    model: dht11      # or dht22 for a DHT22/AM2302
+    gpio: 4           # BCM number; 4 = header pin 7
+  ```
+  The installer adds `dtoverlay=dht11,gpiopin=4` to `/boot/firmware/config.txt`. Linux's own `dht11` driver then handles the timing-critical protocol, which Python can't do reliably, and **a reboot is needed** before the first reading.
+- **Limits of the DHT11:** ±2 °C and ±5 %RH accuracy, a 0–50 °C and 20–90 %RH range, and individual reads fail now and then (the collector retries). With ±2 °C, a 27 °C warning can trigger anywhere from about 25 to 29 °C real. It's fine for getting the system running and spotting trends; for dependable alerts, switch to an SHT45 later. That's a config change plus rewiring, and the data stays.
+- **Humidity alerts near the bottom of the DHT11 range:** below 20 %RH the DHT11 stops being meaningful, so the *Humidity low (critical)* alert at 20 % is unreliable with this sensor.
+- The OLED still uses I2C (pins 3/5) and works alongside a DHT sensor.
 
 The **official 7" touch display** connects to the DSI ribbon port and takes its
 power from the 5 V pins (2/4) and GND; this does not conflict with the sensor.
@@ -393,6 +428,19 @@ sudo /opt/serverroom-monitor/scripts/test-sensor.py
 - **`[Errno 16] Device or resource busy`:** another program is using the sensor. That's normal while the collector runs; `test-sensor.py` still works because I2C is shared.
 - **BME280 found at 0x76 but "Failed to find BME280! Chip ID 0x58":** that's a BMP280, which has no humidity sensor.
 
+### DHT11 / KY-015 not reading
+
+```bash
+grep dht11 /boot/firmware/config.txt          # expect: dtoverlay=dht11,gpiopin=4
+cat /sys/bus/iio/devices/iio:device*/name     # expect: dht11@4
+sudo /opt/serverroom-monitor/scripts/test-sensor.py --count 5
+```
+
+- **No `dht11@…` device:** the overlay line is missing or you haven't rebooted since it was added.
+- **Every read fails with `Connection timed out`:** the sensor isn't answering. Check the S pin is on the GPIO in `sensor.gpio`, that VCC goes to 3.3 V, and the pin order printed on your module.
+- **Some reads fail with `Input/output error`:** that's a checksum error and normal for a DHT11. The collector retries; it only alerts when every attempt in 3 cycles in a row fails.
+- **Readings look off by a couple of degrees:** that's within the DHT11's ±2 °C spec.
+
 ### No data in Grafana
 
 ```bash
@@ -454,7 +502,7 @@ This was built and tested **without a Raspberry Pi**:
 
 **Not tested on hardware** (written to the documented behavior, but never run on a Pi). Please report problems:
 
-- the I2C sensor drivers on real SHT45/SHT31/BME280 chips, and the SSD1306 output;
+- the I2C sensor drivers on real SHT45/SHT31/BME280 chips, the DHT11/KY-015 through the kernel driver (tested against a fake sysfs tree, matching the Raspberry Pi kernel source), and the SSD1306 output;
 - `install.sh` end to end on Raspberry Pi OS (apt packages, `raspi-config nonint`, systemd hardening options with real I2C devices);
 - the cage kiosk and desktop autostart on labwc/wayfire/X11, cursor hiding, rotation and touch, the 7" backlight sysfs paths;
 - the hardware watchdog, ufw together with Tailscale, `tailscale serve`, and the UPS GPIO example;

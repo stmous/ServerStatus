@@ -17,6 +17,11 @@ def create_driver(
 
         return SimulatedDriver(scenario=simulate or "normal", speed=sim_speed)
 
+    if cfg.model in ("dht11", "dht22"):
+        from serverroom_monitor.sensors.dht import DhtDriver  # noqa: PLC0415
+
+        return DhtDriver(cfg.model, cfg.gpio)
+
     from serverroom_monitor.sensors import adafruit  # noqa: PLC0415
 
     drivers: dict[str, type[adafruit._AdafruitDriver]] = {

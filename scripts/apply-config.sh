@@ -106,6 +106,10 @@ if [[ $(cfg firewall.enabled) == 1 ]]; then
 fi
 
 # --- local display ------------------------------------------------------------------------
+step "Sensor overlay"
+sync_dht_overlay
+[[ $(cfg sensor.model) == dht* ]] || ok "not needed for $(cfg sensor.model)"
+
 step "Display: $MODE"
 "$APP_DIR/scripts/setup-kiosk.sh" "$MODE"
 

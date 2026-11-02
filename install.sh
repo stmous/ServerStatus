@@ -175,7 +175,7 @@ grep -q '^i2c-dev' /etc/modules 2>/dev/null || echo i2c-dev >>/etc/modules
 ok "I2C enabled"
 
 if [[ -f $BOOT_CONFIG ]] && ! grep -qE '^dtparam=watchdog=on' "$BOOT_CONFIG"; then
-    printf '\n# serverroom-monitor: hardware watchdog\ndtparam=watchdog=on\n' >>"$BOOT_CONFIG"
+    printf '\n[all]\n# serverroom-monitor: hardware watchdog\ndtparam=watchdog=on\n' >>"$BOOT_CONFIG"
     REBOOT_NEEDED=1
 fi
 install -D -m 644 "$APP_DIR/system/watchdog.conf" /etc/systemd/system.conf.d/serverroom-watchdog.conf
@@ -302,9 +302,34 @@ step "Applying configuration (Grafana, firewall, display, collector)"
 # ============================================================================
 step "Checking the sensor"
 # ============================================================================
+# One-shot read as the service user. DHT sensors fail individual reads
+# fairly often, so take the first good one of a few attempts.
+check_reading() {
+    local out good
+    out=$(runuser -u "$SVC_USER" -- "$SRM" -c "$CONFIG" read --count "$1" 2>/dev/null || true)
+    good=$(grep -m1 '"ok": true' <<<"$out" || true)
+    if [[ -n $good ]]; then
+        ok "reading: $(jq -r '"\(.temperature) °C, \(.humidity) %RH, dew point \(.dew_point) °C"' <<<"$good")"
+    else
+        warn "the sensor read failed: $(tail -1 <<<"$out")"
+        ((SKIP_SENSOR)) || die "sensor read failed (see README > Troubleshooting); --skip-sensor-check to ignore"
+    fi
+}
+
 SENSOR_MODEL=$(cfg sensor.model)
 if [[ $SENSOR_MODEL == simulated ]]; then
     warn "sensor.model is 'simulated' - no hardware check"
+elif [[ $SENSOR_MODEL == dht11 || $SENSOR_MODEL == dht22 ]]; then
+    GPIO=$(cfg sensor.gpio)
+    info "$SENSOR_MODEL on GPIO$GPIO via the kernel dht11 driver"
+    if grep -qs '^dht11' /sys/bus/iio/devices/iio:device*/name; then
+        ok "DHT device present in /sys/bus/iio/devices"
+        check_reading 3
+    else
+        warn "the dht11 overlay is not active yet. Reboot, then check with:"
+        warn "  sudo $APP_DIR/scripts/test-sensor.py"
+        REBOOT_NEEDED=1
+    fi
 else
     ADDR=$(printf '%02x' "$(cfg sensor.i2c_address)")
     info "i2cdetect on bus 1 (expecting $SENSOR_MODEL at 0x$ADDR):"
@@ -313,17 +338,13 @@ else
     # driver has claimed them).
     if i2cdetect -y 1 2>/dev/null | awk 'NR>1 {for (i=2;i<=NF;i++) print $i}' | grep -qx "$ADDR"; then
         ok "device found at 0x$ADDR"
-        if reading=$(runuser -u "$SVC_USER" -- "$SRM" -c "$CONFIG" read 2>/dev/null) &&
-            jq -e '.ok' <<<"$reading" >/dev/null; then
-            ok "reading: $(jq -r '"\(.temperature) °C, \(.humidity) %RH, dew point \(.dew_point) °C"' <<<"$reading")"
-        else
-            warn "device present but the read failed: $reading"
-            ((SKIP_SENSOR)) || die "sensor read failed (see README > Troubleshooting); --skip-sensor-check to ignore"
-        fi
+        check_reading 1
     else
         warn "nothing at 0x$ADDR. Check wiring: VIN->pin 1 (3.3V), GND->pin 6, SDA->pin 3, SCL->pin 5"
         ((SKIP_SENSOR)) || die "sensor not detected (re-run with --skip-sensor-check to finish anyway)"
     fi
+fi
+if [[ $SENSOR_MODEL != simulated ]]; then
     if [[ $(cfg display.mode) == oled ]]; then
         OADDR=$(printf '%02x' "$(cfg display.oled.i2c_address)")
         if i2cdetect -y 1 2>/dev/null | awk 'NR>1 {for (i=2;i<=NF;i++) print $i}' | grep -qx "$OADDR"; then
@@ -348,7 +369,7 @@ cat <<EOF
     After config changes:    sudo $APP_DIR/scripts/apply-config.sh
 
 EOF
-if [[ ${REBOOT_NEEDED:-0} == 1 || $(cfg display.mode) == hdmi ]]; then
-    warn "Reboot to activate the hardware watchdog / kiosk:  sudo reboot"
+if [[ ${REBOOT_NEEDED:-0} == 1 || -f /run/reboot-required || $(cfg display.mode) == hdmi ]]; then
+    warn "Reboot to activate the hardware watchdog / sensor overlay / kiosk:  sudo reboot"
 fi
 trap - ERR

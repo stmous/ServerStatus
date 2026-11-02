@@ -229,10 +229,9 @@ def cmd_check_config(args: argparse.Namespace) -> int:
     ]
     print(f"{args.config}: OK")
     print(f"  location:   {cfg.location}")
-    print(
-        f"  sensor:     {cfg.sensor.model} @ 0x{cfg.sensor.i2c_address:02x}, "
-        f"every {cfg.sensor.poll_interval:g}s"
-    )
+    s = cfg.sensor
+    where = f"GPIO{s.gpio}" if s.model in ("dht11", "dht22") else f"0x{s.i2c_address:02x}"
+    print(f"  sensor:     {s.model} @ {where}, every {s.poll_interval:g}s")
     print(f"  display:    {cfg.display.mode}")
     print(f"  channels:   {', '.join(channels) or 'NONE (alerts will not be delivered!)'}")
     print(f"  heartbeat:  {'configured' if cfg.heartbeat.enabled else 'not configured'}")

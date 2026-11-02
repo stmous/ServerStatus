@@ -194,6 +194,64 @@ tailscale_dns_name() {
     tailscale status --json 2>/dev/null | jq -r '.Self.DNSName // empty' | sed 's/\.$//'
 }
 
+# --- boot config (config.txt) --------------------------------------------------
+
+boot_config() {
+    if [[ -n ${BOOT_CONFIG_PATH:-} ]]; then
+        echo "$BOOT_CONFIG_PATH"
+    elif [[ -f /boot/firmware/config.txt ]]; then
+        echo /boot/firmware/config.txt
+    elif [[ -f /boot/config.txt ]]; then
+        echo /boot/config.txt
+    fi
+}
+
+DHT_MARKER="# serverroom-monitor: DHT sensor (managed, do not edit)"
+REBOOT_FLAG=${REBOOT_FLAG:-/run/reboot-required}
+
+# Remove the managed marker line and the line after it, in place.
+_remove_dht_block() {
+    local tmp
+    tmp=$(mktemp)
+    awk -v m="$DHT_MARKER" 'skip {skip = 0; next} $0 == m {skip = 1; next} {print}' "$1" >"$tmp"
+    cat "$tmp" >"$1" # keep the original file's owner and mode
+    rm -f "$tmp"
+}
+
+# DHT11/DHT22 sensors are read by the kernel's dht11 driver, enabled with a
+# device-tree overlay. Keep exactly one managed overlay line in config.txt in
+# sync with sensor.model / sensor.gpio. Changes need a reboot; the overlay is
+# also loaded at runtime when possible so a first install can work at once.
+sync_dht_overlay() {
+    local boot model gpio line current
+    boot=$(boot_config)
+    model=$(cfg sensor.model)
+    gpio=$(cfg sensor.gpio)
+    if [[ -z $boot ]]; then
+        [[ $model == dht* ]] && warn "config.txt not found: add 'dtoverlay=dht11,gpiopin=$gpio' yourself"
+        return 0
+    fi
+    current=$(grep -A1 -xF "$DHT_MARKER" "$boot" | sed -n 2p || true)
+    if [[ $model == dht11 || $model == dht22 ]]; then
+        line="dtoverlay=dht11,gpiopin=$gpio"
+        [[ $current == "$line" ]] && return 0
+        _remove_dht_block "$boot"
+        # [all] so the line is never swallowed by an earlier [pi4]/[cm4] filter.
+        printf '\n[all]\n%s\n%s\n' "$DHT_MARKER" "$line" >>"$boot"
+        touch "$REBOOT_FLAG"
+        ok "added '$line' to $boot (reboot required)"
+        if command -v dtoverlay >/dev/null && [[ -z $current ]]; then
+            if dtoverlay dht11 "gpiopin=$gpio" 2>/dev/null; then
+                ok "DHT overlay loaded at runtime"
+            fi
+        fi
+    elif [[ -n $current ]]; then
+        _remove_dht_block "$boot"
+        touch "$REBOOT_FLAG"
+        ok "removed DHT overlay from $boot (reboot required)"
+    fi
+}
+
 # --- network ------------------------------------------------------------------
 
 detect_lan_subnets() {

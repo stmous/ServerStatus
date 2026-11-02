@@ -46,6 +46,13 @@ anything stamped before 2025. The Pi 4 has no RTC, so until NTP syncs, the clock
 may show the last shutdown time. At startup the collector waits (bounded) for
 `systemd-timesyncd` to report sync.
 
+**DHT11/DHT22 via the kernel, not Python.** The DHT single-wire protocol needs
+microsecond timing, which userspace Python on Linux can't guarantee (the
+Adafruit DHT library is notoriously flaky on a Pi). The Raspberry Pi kernel's
+`dht11` driver (enabled by `dtoverlay=dht11,gpiopin=N`) decodes it in interrupt
+context and exposes the result through IIO sysfs, so the driver here just reads
+two files. It needs no extra Python dependency.
+
 ## Validation
 
 1. **Bounds:** −20…80 °C, 0…100 %RH. Out-of-range values are garbage and count as a sensor failure. A sensor that only returns garbage is a broken sensor.

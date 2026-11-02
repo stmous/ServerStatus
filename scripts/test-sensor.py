@@ -3,6 +3,7 @@
 
     sudo /opt/serverroom-monitor/scripts/test-sensor.py            # uses config.yaml
     sudo /opt/serverroom-monitor/scripts/test-sensor.py --model sht4x --address 0x44
+    sudo /opt/serverroom-monitor/scripts/test-sensor.py --model dht11 --gpio 4   # KY-015
     sudo /opt/serverroom-monitor/scripts/test-sensor.py --count 10
 
 Does not need InfluxDB or the collector service (stop the service first if
@@ -12,6 +13,7 @@ you see I2C "resource busy" errors: sudo systemctl stop serverroom-monitor).
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import os
 import subprocess
 import sys
@@ -39,6 +41,24 @@ Expected wiring (sensor -> Raspberry Pi header):
   VIN -> pin 1 (3.3 V)     GND -> pin 6
   SDA -> pin 3 (GPIO2)     SCL -> pin 5 (GPIO3)"""
 
+DHT_WIRING = """\
+Expected wiring for a DHT11/KY-015 (module pin -> Raspberry Pi header):
+  S (signal) -> pin 7 (GPIO4, or the GPIO set in sensor.gpio)
+  + / VCC    -> pin 1 (3.3 V)  -- not 5 V: the module's pull-up would put 5 V on the GPIO
+  - / GND    -> pin 9
+DHT reads fail now and then (EIO/timeout); a few failures out of 5 are normal."""
+
+IIO = Path("/sys/bus/iio/devices")
+
+
+def dht_status() -> str:
+    devices = [
+        f"  {d.name}: {(d / 'name').read_text().strip()}"
+        for d in sorted(IIO.glob("iio:device*"))
+        if (d / "name").exists()
+    ]
+    return "\n".join(devices) or "  (no IIO devices: the dht11 overlay is not active)"
+
 
 def i2cdetect() -> str:
     try:
@@ -53,26 +73,40 @@ def i2cdetect() -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("-c", "--config", type=Path, default=DEFAULT_CONFIG_PATH)
-    ap.add_argument("--model", choices=("sht4x", "sht31", "bme280"))
+    ap.add_argument("--model", choices=("sht4x", "sht31", "bme280", "dht11", "dht22"))
     ap.add_argument("--address", type=lambda v: int(v, 0))
+    ap.add_argument("--gpio", type=int, help="BCM GPIO of a DHT sensor (default 4)")
     ap.add_argument("--count", type=int, default=3)
     args = ap.parse_args()
 
     if args.model:
-        default_addr = {"sht4x": 0x44, "sht31": 0x44, "bme280": 0x76}[args.model]
-        sensor_cfg = SensorConfig(model=args.model, i2c_address=args.address or default_addr)
+        default_addr = {"sht4x": 0x44, "sht31": 0x44, "bme280": 0x76}.get(args.model, 0)
+        sensor_cfg = SensorConfig(
+            model=args.model, i2c_address=args.address or default_addr, gpio=args.gpio or 4
+        )
     else:
         sensor_cfg = load_config(args.config, env={}).sensor
-        if args.address:
-            sensor_cfg = SensorConfig(model=sensor_cfg.model, i2c_address=args.address)
+        if args.address or args.gpio:
+            sensor_cfg = dataclasses.replace(
+                sensor_cfg,
+                i2c_address=args.address or sensor_cfg.i2c_address,
+                gpio=args.gpio or sensor_cfg.gpio,
+            )
 
-    print(f"Sensor: {sensor_cfg.model} at 0x{sensor_cfg.i2c_address:02x}\n")
-    if not Path("/dev/i2c-1").exists():
-        print("/dev/i2c-1 does not exist: I2C is disabled.")
-        print("Enable it with: sudo raspi-config nonint do_i2c 0 && sudo reboot")
-        return 1
-    print("I2C bus 1 scan:")
-    print(i2cdetect())
+    is_dht = sensor_cfg.model in ("dht11", "dht22")
+    wiring = DHT_WIRING if is_dht else WIRING
+    if is_dht:
+        print(f"Sensor: {sensor_cfg.model} on GPIO{sensor_cfg.gpio} (kernel dht11 driver)\n")
+        print("IIO devices:")
+        print(dht_status() + "\n")
+    else:
+        print(f"Sensor: {sensor_cfg.model} at 0x{sensor_cfg.i2c_address:02x}\n")
+        if not Path("/dev/i2c-1").exists():
+            print("/dev/i2c-1 does not exist: I2C is disabled.")
+            print("Enable it with: sudo raspi-config nonint do_i2c 0 && sudo reboot")
+            return 1
+        print("I2C bus 1 scan:")
+        print(i2cdetect())
 
     driver = create_driver(sensor_cfg)
     ok = 0
@@ -93,9 +127,10 @@ def main() -> int:
     driver.close()
 
     if ok == 0:
-        print(f"\nNo successful reads.\n{WIRING}")
-        print("If the address is missing from the scan above, check wiring and power;")
-        print("if a different address shows up, set sensor.i2c_address in config.yaml.")
+        print(f"\nNo successful reads.\n{wiring}")
+        if not is_dht:
+            print("If the address is missing from the scan above, check wiring and power;")
+            print("if a different address shows up, set sensor.i2c_address in config.yaml.")
         return 1
     print(f"\n{ok}/{args.count} reads OK.")
     return 0

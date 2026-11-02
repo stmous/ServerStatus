@@ -97,3 +97,38 @@ def test_cfg_reads_validated_values(tmp_path: Path) -> None:
     )
     assert r.returncode == 0, r.stderr
     assert r.stdout.split("\n")[:5] == ["oled", "0", "10.0.0.0/24 10.1.0.0/24", "68", "2592000"]
+
+
+MARKER = "# serverroom-monitor: DHT sensor (managed, do not edit)"
+
+
+def test_dht_overlay_sync(tmp_path: Path) -> None:
+    boot = tmp_path / "config.txt"
+    boot.write_text("dtparam=audio=on\n[cm4]\notg_mode=1\n[all]\n")
+    cfg = tmp_path / "etc" / "config.yaml"
+    cfg.parent.mkdir(parents=True)
+    env = {"BOOT_CONFIG_PATH": str(boot), "REBOOT_FLAG": str(tmp_path / "reboot")}
+
+    def sync(sensor: str) -> str:
+        cfg.write_text(f"sensor: {sensor}\n")
+        r = bash("sync_dht_overlay", tmp_path, **env)
+        assert r.returncode == 0, r.stderr
+        return boot.read_text()
+
+    text = sync("{model: dht11, gpio: 4}")
+    assert text.endswith(f"[all]\n{MARKER}\ndtoverlay=dht11,gpiopin=4\n")
+    assert (tmp_path / "reboot").exists()
+
+    (tmp_path / "reboot").unlink()
+    assert sync("{model: dht11, gpio: 4}") == text  # idempotent
+    assert not (tmp_path / "reboot").exists()
+
+    text = sync("{model: dht22, gpio: 17}")
+    assert text.count(MARKER) == 1
+    assert "gpiopin=17" in text
+    assert "gpiopin=4" not in text
+
+    text = sync("{model: sht4x}")
+    assert MARKER not in text
+    assert "dtoverlay=dht11" not in text
+    assert text.startswith("dtparam=audio=on\n[cm4]\notg_mode=1\n[all]\n")

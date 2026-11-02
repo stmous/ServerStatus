@@ -22,9 +22,17 @@ sensor:
   # sht4x   - Sensirion SHT40/41/45 (recommended; address 0x44, 0x45 or 0x46)
   # sht31   - Sensirion SHT30/31/35 (0x44 or 0x45)
   # bme280  - Bosch BME280 (0x76 or 0x77). Runs ~1 degC warm from self-heating.
+  # dht11   - DHT11 / KY-015 module on a GPIO pin (not I2C). Coarse: +/-2 degC,
+  #           +/-5 %RH, 0-50 degC, 20-90 %RH. Fine to get started; see README.
+  # dht22   - DHT22 / AM2302 on a GPIO pin (+/-0.5 degC, +/-2-5 %RH)
   # simulated - fake data, for testing without hardware
   model: sht4x
+  # I2C sensors only
   i2c_address: 0x44
+  # DHT sensors only: BCM GPIO number of the data pin (4 = header pin 7).
+  # install.sh / apply-config.sh add "dtoverlay=dht11,gpiopin=<gpio>" to
+  # config.txt; a change needs a reboot.
+  gpio: 4
 
   # How often to read the sensor.
   poll_interval: 30s

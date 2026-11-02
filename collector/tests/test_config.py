@@ -94,7 +94,7 @@ def test_bme280_default_address() -> None:
 @pytest.mark.parametrize(
     ("data", "message"),
     [
-        ({"sensor": {"model": "dht22"}}, "sensor.model"),
+        ({"sensor": {"model": "bmp180"}}, "sensor.model"),
         ({"sensor": {"model": "bme280", "i2c_address": 0x44}}, "not valid for bme280"),
         ({"sensor": {"poll_interval": "1s"}}, "sensor.poll_interval"),
         ({"display": {"mode": "lcd"}}, "display.mode"),

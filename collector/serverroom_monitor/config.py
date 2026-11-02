@@ -19,7 +19,7 @@ import yaml
 
 DEFAULT_CONFIG_PATH = Path("/etc/serverroom-monitor/config.yaml")
 
-SensorModel = Literal["sht4x", "sht31", "bme280", "simulated"]
+SensorModel = Literal["sht4x", "sht31", "bme280", "dht11", "dht22", "simulated"]
 DisplayMode = Literal["hdmi", "oled", "none"]
 WebhookType = Literal["slack", "discord", "teams", "generic"]
 
@@ -27,6 +27,8 @@ SENSOR_ADDRESSES: dict[str, tuple[int, ...]] = {
     "sht4x": (0x44, 0x45, 0x46),
     "sht31": (0x44, 0x45),
     "bme280": (0x76, 0x77),
+    "dht11": (),  # single-wire on a GPIO, not I2C
+    "dht22": (),
     "simulated": (),
 }
 
@@ -96,6 +98,7 @@ class TimeWindow:
 class SensorConfig:
     model: SensorModel = "sht4x"
     i2c_address: int = 0x44
+    gpio: int = 4  # BCM GPIO number, DHT11/DHT22 only
     poll_interval: float = 30.0
     read_retries: int = 3
     retry_backoff: float = 0.5
@@ -391,17 +394,21 @@ class _Section:
 
 def _parse_sensor(s: _Section) -> SensorConfig:
     model = cast(
-        "SensorModel", s.choice("model", "sht4x", ("sht4x", "sht31", "bme280", "simulated"))
+        "SensorModel",
+        s.choice("model", "sht4x", ("sht4x", "sht31", "bme280", "dht11", "dht22", "simulated")),
     )
-    default_addr = {"sht4x": 0x44, "sht31": 0x44, "bme280": 0x76, "simulated": 0}[model]
+    default_addr = {"sht4x": 0x44, "sht31": 0x44, "bme280": 0x76}.get(model, 0)
     address = s.int_("i2c_address", default_addr, 0, 0x7F)
     allowed = SENSOR_ADDRESSES[model]
     if allowed and address not in allowed:
         valid = ", ".join(hex(a) for a in allowed)
         raise ConfigError(f"sensor.i2c_address: {hex(address)} is not valid for {model} ({valid})")
+    # GPIO 2/3 are the I2C bus (OLED); 0/1 are reserved for HAT EEPROMs.
+    gpio = s.int_("gpio", 4, 4, 27)
     return SensorConfig(
         model=model,
         i2c_address=address,
+        gpio=gpio,
         poll_interval=s.duration("poll_interval", 30.0, 2.0, 3600.0),
         read_retries=s.int_("read_retries", 3, 0, 10),
         retry_backoff=s.duration("retry_backoff", 0.5, 0.0, 10.0),
