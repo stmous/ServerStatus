@@ -34,7 +34,7 @@ n_enabled email && [[ -n $(cfg notifications.email.smtp_user) && -z $(secret_get
     missing+=(SMTP_PASSWORD)
 ((${#missing[@]} == 0)) || warn "enabled channels need secrets that are empty in $SECRETS: ${missing[*]}"
 write_service_envs
-ok "env/collector.env, env/grafana.env"
+ok "env/collector.env, env/grafana.env, env/telegram-bot.env"
 
 # --- sensor -------------------------------------------------------------------------
 # Early on purpose: it must not depend on Grafana or anything else below.
@@ -59,7 +59,8 @@ install -D -m 644 "$APP_DIR/systemd/grafana-server.service.d/serverroom.conf" \
 install -D -m 644 "$APP_DIR/systemd/influxdb.service.d/serverroom.conf" \
     /etc/systemd/system/influxdb.service.d/serverroom.conf
 for unit in serverroom-monitor.service serverroom-kiosk.service serverroom-backlight.service \
-    serverroom-backlight.timer serverroom-backup.service serverroom-backup.timer; do
+    serverroom-backlight.timer serverroom-backup.service serverroom-backup.timer \
+    serverroom-telegram-bot.service; do
     install -m 644 "$APP_DIR/systemd/$unit" "/etc/systemd/system/$unit"
 done
 systemctl daemon-reload
@@ -140,6 +141,22 @@ if systemctl is-active --quiet serverroom-monitor.service; then
     ok "serverroom-monitor is running"
 else
     warn "serverroom-monitor is not running: journalctl -u serverroom-monitor -n 30"
+fi
+
+# --- Telegram bot ---------------------------------------------------------------------------
+step "Telegram bot (/status)"
+if [[ $(cfg notifications.telegram.enabled) == 1 && $(cfg notifications.telegram.commands) == 1 ]]; then
+    systemctl enable serverroom-telegram-bot.service >/dev/null 2>&1
+    systemctl restart serverroom-telegram-bot.service
+    sleep 2
+    if systemctl is-active --quiet serverroom-telegram-bot.service; then
+        ok "send /status to your bot"
+    else
+        warn "bot not running: journalctl -u serverroom-telegram-bot -n 30"
+    fi
+else
+    systemctl disable --now serverroom-telegram-bot.service >/dev/null 2>&1 || true
+    ok "disabled (needs notifications.telegram.enabled and .commands)"
 fi
 
 if ((!GRAFANA_OK)); then

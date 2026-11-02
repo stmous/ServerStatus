@@ -37,7 +37,8 @@ fi
 
 step "Stopping services"
 for unit in serverroom-monitor.service serverroom-kiosk.service serverroom-backlight.timer \
-    serverroom-backlight.service serverroom-backup.timer serverroom-backup.service; do
+    serverroom-backlight.service serverroom-backup.timer serverroom-backup.service \
+    serverroom-telegram-bot.service; do
     systemctl disable --now "$unit" >/dev/null 2>&1 || true
     rm -f "/etc/systemd/system/$unit"
 done

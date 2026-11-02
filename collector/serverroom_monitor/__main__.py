@@ -28,7 +28,15 @@ from serverroom_monitor.sensors.simulated import SCENARIOS
 
 log = logging.getLogger("serverroom_monitor")
 
-SUBCOMMANDS = ("run", "read", "check-config", "render-grafana", "backlight", "test-alerts")
+SUBCOMMANDS = (
+    "run",
+    "read",
+    "check-config",
+    "render-grafana",
+    "backlight",
+    "test-alerts",
+    "telegram-bot",
+)
 
 
 class _PrintWriter:
@@ -99,6 +107,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="talk to Telegram/SMTP/webhook directly instead of through Grafana",
     )
     alerts.add_argument("--grafana-url", default=None, help="override grafana.url")
+
+    sub.add_parser("telegram-bot", help="answer /status in the configured Telegram chat")
     return parser
 
 
@@ -262,6 +272,38 @@ def cmd_test_alerts(args: argparse.Namespace) -> int:
     return run_test_alerts(cfg, direct=args.direct, grafana_url=args.grafana_url)
 
 
+def cmd_telegram_bot(args: argparse.Namespace) -> int:
+    import os  # noqa: PLC0415
+    import signal  # noqa: PLC0415
+    from types import FrameType  # noqa: PLC0415
+
+    from serverroom_monitor.telegram_bot import InfluxReader, StatusBot  # noqa: PLC0415
+
+    cfg = _load(args.config)
+    tg = cfg.notifications.telegram
+    if not (tg.enabled and tg.commands):
+        log.error("notifications.telegram.enabled and .commands must both be true")
+        return 2
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    read_token = os.environ.get("INFLUX_READ_TOKEN", "")
+    if not token or not read_token:
+        log.error("TELEGRAM_BOT_TOKEN and INFLUX_READ_TOKEN must be set")
+        return 2
+    stop = threading.Event()
+
+    # The bot holds no state, so exit at once instead of waiting for the
+    # open long-poll request (up to ~50 s) to return.
+    def _exit(signum: int, _frame: FrameType | None) -> None:
+        log.info("received %s, shutting down", signal.Signals(signum).name)
+        stop.set()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _exit)
+    signal.signal(signal.SIGINT, _exit)
+    StatusBot(cfg, token, InfluxReader(cfg.influxdb, read_token), stop=stop).run_forever()
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     # Default to "run" so `serverroom-monitor --simulate` works as expected.
@@ -280,6 +322,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "render-grafana": cmd_render,
         "backlight": cmd_backlight,
         "test-alerts": cmd_test_alerts,
+        "telegram-bot": cmd_telegram_bot,
     }
     return handlers[args.command](args)
 

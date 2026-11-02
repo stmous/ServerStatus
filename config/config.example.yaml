@@ -173,6 +173,10 @@ notifications:
     # Numeric chat ID (groups start with -100...). See README.
     # Secret: TELEGRAM_BOT_TOKEN
     chat_id: ""
+    # Answer /status in that chat (current readings, alert level, 24 h
+    # min/max). Only this chat gets answers; no port is opened (the bot polls
+    # Telegram over outbound HTTPS).
+    commands: true
 
   email:
     enabled: false

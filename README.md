@@ -212,6 +212,28 @@ Warnings repeat every 4 h, critical alerts every hour, until resolved.
    TELEGRAM_BOT_TOKEN='123456789:AAH...'
    ```
 
+#### Asking for the status: `/status`
+
+With Telegram enabled, the bot also answers commands in that chat (set
+`notifications.telegram.commands: false` to turn this off):
+
+```
+/status
+🟢 OK - server-room
+🌡 22.8 °C   💧 41 %RH   dew point 8.7 °C
+Last reading 3 s ago (13:43:45)
+Sensor: OK
+24 h: 22.6-24.1 °C (avg 23.2) · 40-42 %RH (avg 41)
+Limits: warn > 27 °C, crit > 30 °C; RH 25-60 %
+```
+
+`/help` lists the commands. The bot (`serverroom-telegram-bot.service`) only
+makes outbound HTTPS requests to Telegram, so no port is opened. It **only
+answers the configured chat**: messages from anyone else are ignored and logged
+(`journalctl -u serverroom-telegram-bot`, which also shows the chat ID of
+whoever wrote). The level shown is computed from your thresholds on the latest
+reading; Grafana's alerts additionally wait for the pending period.
+
 ### Email (SMTP)
 
 Set `notifications.email` in the config (server, port, from address, recipients)

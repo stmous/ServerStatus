@@ -117,6 +117,11 @@ write_service_envs() {
             printf "WEBHOOK_URL='%s'\n" "${WEBHOOK_URL:-}"
             printf "DEADMAN_URL='%s'\n" "${DEADMAN_URL:-}"
         } >"$ENV_DIR/grafana.env"
+        {
+            echo "# Generated from secrets.env by serverroom-monitor. Do not edit."
+            printf "TELEGRAM_BOT_TOKEN='%s'\n" "${TELEGRAM_BOT_TOKEN:-}"
+            printf "INFLUX_READ_TOKEN='%s'\n" "${INFLUX_READ_TOKEN:-}"
+        } >"$ENV_DIR/telegram-bot.env"
     )
     chmod 600 "$ENV_DIR"/*.env
 }

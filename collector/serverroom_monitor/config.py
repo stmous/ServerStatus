@@ -196,6 +196,7 @@ class Thresholds:
 class TelegramConfig:
     enabled: bool = False
     chat_id: str = ""
+    commands: bool = True  # answer /status in that chat
 
 
 @dataclass(frozen=True)
@@ -522,7 +523,11 @@ def _parse_thresholds(s: _Section) -> Thresholds:
 
 def _parse_notifications(s: _Section) -> NotificationsConfig:
     tg = s.section("telegram")
-    telegram = TelegramConfig(enabled=tg.bool_("enabled", False), chat_id=tg.str_("chat_id", ""))
+    telegram = TelegramConfig(
+        enabled=tg.bool_("enabled", False),
+        chat_id=tg.str_("chat_id", ""),
+        commands=tg.bool_("commands", True),
+    )
     if telegram.enabled and not re.fullmatch(r"-?\d+|@\w+", telegram.chat_id):
         raise ConfigError(
             "notifications.telegram.chat_id: must be a numeric chat ID (e.g. -1001234567890)"

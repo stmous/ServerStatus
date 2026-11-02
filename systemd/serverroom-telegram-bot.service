@@ -1,0 +1,40 @@
+[Unit]
+Description=Server room monitor Telegram bot (/status)
+Documentation=file:///opt/serverroom-monitor/README.md
+Wants=network-online.target
+After=network-online.target influxdb.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=serverroom
+Group=serverroom
+EnvironmentFile=/etc/serverroom-monitor/env/telegram-bot.env
+ExecStart=/opt/serverroom-monitor/venv/bin/serverroom-monitor --config /etc/serverroom-monitor/config.yaml telegram-bot
+Restart=always
+RestartSec=15
+TimeoutStopSec=15
+
+# --- hardening (network client only: no devices, no writes) -------------------
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target
