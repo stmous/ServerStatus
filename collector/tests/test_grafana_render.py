@@ -201,6 +201,8 @@ def test_render_default_binds_localhost(tmp_path: Path) -> None:
     assert 'GF_SECURITY_COOKIE_SECURE="true"' in settings
     # Grafana 13: the InfluxDB datasource is a plugin that must exist before startup.
     assert 'GF_PLUGINS_PREINSTALL_SYNC="influxdb"' in settings
+    home = f'GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH="{tmp_path / "dashboards/server-room.json"}"'
+    assert home in settings
     assert "GF_SERVER_ROOT_URL" not in settings
 
 

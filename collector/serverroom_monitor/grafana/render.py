@@ -83,6 +83,10 @@ def grafana_settings(cfg: Config, provisioning_dir: Path, root_url: str | None) 
     }[email.starttls]
     settings = {
         "GF_PATHS_PROVISIONING": str(provisioning_dir),
+        # Open the Server Room dashboard instead of Grafana's empty home page.
+        "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": str(
+            provisioning_dir.parent / "dashboards" / "server-room.json"
+        ),
         # Localhost only unless LAN access is explicitly enabled; remote
         # access goes through `tailscale serve` which connects to localhost.
         "GF_SERVER_HTTP_ADDR": "0.0.0.0" if g.lan_access else "127.0.0.1",  # noqa: S104
