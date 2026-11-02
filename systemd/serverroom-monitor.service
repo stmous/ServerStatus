@@ -42,10 +42,11 @@ LockPersonality=yes
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 CapabilityBoundingSet=
-# Only the I2C bus (and gpiomem, which Blinka's board detection may open).
+# Only the I2C bus, plus the GPIO chip/gpiomem that Blinka's pin setup may open.
 DevicePolicy=closed
 DeviceAllow=char-i2c rw
 DeviceAllow=/dev/gpiomem rw
+DeviceAllow=char-gpiochip rw
 MemoryMax=256M
 
 [Install]

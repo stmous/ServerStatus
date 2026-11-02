@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import threading
 from typing import Any
 
@@ -15,6 +16,12 @@ from serverroom_monitor.models import RawReading
 from serverroom_monitor.sensors.base import SensorDriver, SensorError
 
 log = logging.getLogger(__name__)
+
+# Blinka >= 10 checks its "platform dependencies" on `import board` and, on a
+# terminal, interactively offers to pip-install PWM/NeoPixel backends we never
+# use. The one it really needs on a Pi 4 (gpiod 2.x) is pinned in
+# requirements.txt, so skip the check: it must never prompt or block a service.
+os.environ.setdefault("BLINKA_SKIP_DEPENDENCY_CHECK", "1")
 
 # One shared bus object per process: the OLED and the sensor sit on the same
 # bus, and Blinka's busio.I2C locking is per object.

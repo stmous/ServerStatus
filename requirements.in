@@ -3,6 +3,9 @@
 #   uv pip compile requirements.in -o requirements.txt \
 #     --python-version 3.11 --python-platform aarch64-unknown-linux-gnu
 adafruit-blinka
+# Blinka >= 10 imports gpiod for the Raspberry Pi pin map (even for plain I2C)
+# and rejects Bookworm's python3-libgpiod 1.6 as outdated, so pin v2 here.
+gpiod>=2.2.2,<3
 adafruit-circuitpython-sht4x
 adafruit-circuitpython-sht31d
 adafruit-circuitpython-bme280

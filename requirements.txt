@@ -48,6 +48,8 @@ certifi==2026.10.23
     # via requests
 charset-normalizer==3.5.2
     # via requests
+gpiod==2.5.0
+    # via -r requirements.in
 idna==3.20
     # via requests
 packaging==26.3
